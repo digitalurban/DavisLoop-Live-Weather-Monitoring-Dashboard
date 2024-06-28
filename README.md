@@ -11,7 +11,7 @@ This project displays real-time weather data from a Davis personal weather stati
 
 ## Live Demo
 
-Check out the live demo of the weather graph here: [Live Weather Graph Demo] (https://www.finchamweather.co.uk/weathergraph.htm)
+Live demo of the weather graph here: [Live Weather Graph Demo] (https://www.finchamweather.co.uk/weathergraph.htm)
 
 ## Features
 
