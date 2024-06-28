@@ -69,7 +69,7 @@ You can customize the chart appearance, data retention period, and update interv
 
 ## Contributing
 
-Contributions, issues, and feature requests are welcome. Feel free to check [issues page](https://github.com/yourusername/live-weather-graph/issues) if you want to contribute.
+Contributions, issues, and feature requests are welcome. 
 
 ## License
 
