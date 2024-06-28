@@ -99,6 +99,8 @@
     var port = location.protocol === 'https:' ? 8081 : 8080;
     var options = {
         timeout: 3,
+        onSuccess: onConnect,
+        onFailure: onFailure,
         useSSL: location.protocol === 'https:',
     };
     var clientID = "clientID" + parseInt(Math.random() * 100);
@@ -122,48 +124,35 @@
         dot.classList.add("pulse-once");
         setTimeout(() => {
             dot.classList.remove("pulse-once");
-        }, 1000);
+        }, 1000); // Duration of the pulse-once animation
+    }
+
+    function onFailure(message) {
+        console.log("Connection Attempt to Host " + host + " Failed: ", message.errorMessage);
+        updateConnectionStatus("disconnected");
+        setTimeout(MQTTconnect, reconnectTimeout);
+    }
+
+    function onConnect() {
+        console.log("Connected ");
+        updateConnectionStatus("connected");
+        mqtt.subscribe("personal/ucfnaps/downhamweather/loop");
+        mqtt.subscribe("personal/ucfnaps/eink/met");
     }
 
     function MQTTconnect() {
         console.log("Connecting to " + host + " on port " + port);
         updateConnectionStatus("reconnecting");
-        
-        if (mqtt && mqtt.isConnected()) {
-            mqtt.disconnect();
-        }
-        
         mqtt = new Paho.MQTT.Client(host, port, clientID);
         mqtt.onMessageArrived = onMessageArrived;
         mqtt.onConnectionLost = function(responseObject) {
             if (responseObject.errorCode !== 0) {
                 console.log("Connection Lost: " + responseObject.errorMessage);
                 updateConnectionStatus("disconnected");
-                setTimeout(MQTTconnect, reconnectTimeout);
+                setTimeout(MQTTconnect, reconnectTimeout);  // Attempt to reconnect
             }
         };
-        mqtt.connect({
-            ...options,
-            onSuccess: function() {
-                console.log("Connected ");
-                updateConnectionStatus("connected");
-                mqtt.subscribe("personal/ucfnaps/downhamweather/loop");
-                mqtt.subscribe("personal/ucfnaps/eink/met");
-            },
-            onFailure: function(message) {
-                console.log("Connection Attempt to Host " + host + " Failed: ", message.errorMessage);
-                updateConnectionStatus("disconnected");
-                setTimeout(MQTTconnect, reconnectTimeout);
-            }
-        });
-    }
-
-    function checkConnection() {
-        if (!mqtt.isConnected()) {
-            console.log("Connection lost. Attempting to reconnect...");
-            updateConnectionStatus("reconnecting");
-            MQTTconnect();
-        }
+        mqtt.connect(options);
     }
 
     // Chart.js setup
@@ -171,19 +160,22 @@
     const weatherChart = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: [],
+            labels: [],  // Time labels
             datasets: [{
                 label: 'Wind Speed (mph)',
                 data: [],
+                radius: 0,
                 borderColor: 'rgba(75, 192, 192, 1)',
                 borderWidth: 3,
                 fill: false,
                 yAxisID: 'y-axis-1',
                 tension: 0.1
+         
             },
             {
                 label: 'Temperature (°C)',
                 data: [],
+ 		radius: 0,
                 borderColor: 'rgba(255, 99, 132, 1)',
                 borderWidth: 3,
                 fill: false,
@@ -193,6 +185,7 @@
             {
                 label: 'Solar Radiation (W/m²)',
                 data: [],
+ 		radius: 0,
                 borderColor: 'rgba(255, 206, 86, 1)',
                 borderWidth: 3,
                 fill: false,
@@ -202,6 +195,7 @@
             {
                 label: 'Rain Amount (mm)',
                 data: [],
+ 		radius: 0,
                 borderColor: 'rgba(54, 162, 235, 1)',
                 borderWidth: 3,
                 fill: false,
@@ -211,6 +205,7 @@
             {
                 label: 'Pressure (mbar)',
                 data: [],
+ 		radius: 0,
                 borderColor: 'rgba(153, 102, 255, 1)',
                 borderWidth: 3,
                 fill: false,
@@ -231,7 +226,7 @@
                 decimation: {
                     enabled: true,
                     algorithm: 'min-max',
-                    samples: 100,
+                    samples: 100,  // Adjust this value as needed for performance
                 },
             },
             scales: {
@@ -315,8 +310,8 @@
         }
     });
 
-    let lastUpdate = Date.now();
-    let firstUpdate = true;
+    let lastUpdate = Date.now();  // Initialize to current time
+    let firstUpdate = true;  // Flag to ensure first update happens immediately
 
     let maxWindSpeed = 0;
     let maxTemp = -Infinity;
@@ -324,17 +319,21 @@
     let maxPressure = -Infinity;
     let minPressure = Infinity;
 
+
+
     function updateWindSpeed(windSpeed, timestamp) {
-        console.log(`Received wind speed: ${windSpeed}, Current max: ${maxWindSpeed}`);
+    console.log(`Received wind speed: ${windSpeed}, Current max: ${maxWindSpeed}`);
         weatherChart.data.labels.push(timestamp);
         weatherChart.data.datasets[0].data.push(windSpeed);
 
+        // Update max wind speed
         if (windSpeed > maxWindSpeed - 0.1) {
             maxWindSpeed = windSpeed;
             document.getElementById('maxWindSpeed').innerText = `Max Wind Speed: ${maxWindSpeed} mph`;
         }
 
-        if (weatherChart.data.labels.length > 1440 * 24) {
+        // Limit the number of data points to keep the chart responsive
+        if (weatherChart.data.labels.length > 1440 * 24) { // Assuming 1 data point per 2.5 seconds, keep 24 hours of data
             weatherChart.data.labels.shift();
             weatherChart.data.datasets[0].data.shift();
         }
@@ -348,11 +347,13 @@
         weatherChart.data.datasets[3].data.push({x: timestamp, y: rainAmount > 0 ? rainAmount : null});
         weatherChart.data.datasets[4].data.push({x: timestamp, y: pressure});
 
+        // Log current values for debugging
         console.log(`Current maxTemp: ${maxTemp}, new temperature: ${temperature}`);
         console.log(`Current minTemp: ${minTemp}, new temperature: ${temperature}`);
         console.log(`Current maxPressure: ${maxPressure}, new pressure: ${pressure}`);
         console.log(`Current minPressure: ${minPressure}, new pressure: ${pressure}`);
 
+        // Update max and min temperature
         if (temperature > maxTemp) {
             maxTemp = temperature;
             document.getElementById('maxTemp').innerText = `Max Temperature: ${maxTemp} °C`;
@@ -364,6 +365,7 @@
             console.log(`Updated minTemp: ${minTemp}`);
         }
 
+        // Update max and min pressure
         if (pressure > maxPressure) {
             maxPressure = pressure;
             document.getElementById('maxPressure').innerText = `Max Pressure: ${maxPressure} mbar`;
@@ -375,7 +377,8 @@
             console.log(`Updated minPressure: ${minPressure}`);
         }
 
-        if (weatherChart.data.labels.length > 1440 * 24) {
+        // Limit the number of data points to keep the chart responsive
+        if (weatherChart.data.labels.length > 1440 * 24) { // Assuming 1 data point per minute, keep 24 hours of data
             weatherChart.data.datasets[1].data.shift();
             weatherChart.data.datasets[2].data.shift();
             weatherChart.data.datasets[3].data.shift();
@@ -393,22 +396,25 @@
         console.log("Message Arrived: " + message.destinationName + " : " + message.payloadString);
         if (message.destinationName === "personal/ucfnaps/downhamweather/loop") {
             const data = JSON.parse(message.payloadString);
-            const windSpeed = data['windSpeed_mph'];
-            const temperature = data['outTemp_C'];
-            const solarRadiation = data['radiation_Wpm2'];
-            const rainAmount = data['dayRain_mm'];
-            const pressure = data['pressure_mbar'];
+            const windSpeed = data['windSpeed_mph'];  // Adjust this key according to your data structure
+            const temperature = data['outTemp_C'];  // Adjust this key according to your data structure
+            const solarRadiation = data['radiation_Wpm2'];  // Adjust this key according to your data structure
+            const rainAmount = data['dayRain_mm'];  // Adjust this key according to your data structure
+            const pressure = data['pressure_mbar'];  // Adjust this key according to your data structure
 
             const nowTimestamp = new Date();
 
+            // Update wind speed every time
             updateWindSpeed(windSpeed, nowTimestamp);
 
             if (firstUpdate || Date.now() - lastUpdate >= 60000) {
+                // Update other metrics every minute
                 updateOtherMetrics(temperature, solarRadiation, rainAmount, pressure, nowTimestamp);
                 lastUpdate = Date.now();
-                firstUpdate = false;
+                firstUpdate = false;  // Ensure subsequent updates follow the interval
             }
 
+            // Pulse the dot when new data arrives
             pulseDot();
         } else if (message.destinationName === "personal/ucfnaps/eink/met") {
             const forecast = message.payloadString + " Source UK Met Office";
@@ -416,16 +422,8 @@
         }
     }
 
-    document.addEventListener("visibilitychange", function() {
-        if (!document.hidden) {
-            console.log("Tab is active again. Checking connection...");
-            checkConnection();
-        }
-    });
-
     window.onload = function() {
         MQTTconnect();
-        setInterval(checkConnection, 30000); // Check connection every 30 seconds
     }
 </script>
 </body>
